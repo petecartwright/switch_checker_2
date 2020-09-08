@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+# Globals: set of globals
+
+# Description: String
+
+# Metadata: template metadata
+
+# Parameters: set of parameters
+
+# Mappings: set of mappings
+
+# Conditions: set of conditions
+
+Resources:
+  AvailCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./src/avail_check
+      Description: "Function to fetch and store availabilty"
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref StockDataTable
+      Events:
+        RefreshScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: "rate(6 hours)"
+            Name: RefreshSchedule
+            Description: "Schedule to fetch new data"
+            Enabled: True
+        HttpApiEvent:
+          Type: HttpApi
+          Method: GET
+          Path: /stock
+      FunctionName: RefreshStock
+      Handler: handler.handler
+      MemorySize: 512
+      Policies:
+        - Statement:
+            - Sid: ReadAndWriteToStockTable
+              Effect: Allow
+              Action:
+                - dynamodb:BatchGetItem
+                - dynamodb:DeleteItem
+                - dynamodb:DescribeTable
+                - dynamodb:GetItem
+                - dynamodb:ListTables
+                - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource: !GetAtt StockDataTable.Arn
+      Runtime: python3.7
+      Timeout: 600
+
+  StockDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: refresh_date
+          AttributeType: S
+        - AttributeName: zip_code
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: zip_code
+          KeyType: HASH
+        - AttributeName: refresh_date
+          KeyType: RANGE
+      TableName: stock
+# Outputs: set of outputs

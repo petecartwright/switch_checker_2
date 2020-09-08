@@ -1,0 +1,14 @@
+- move page to s3 hosted
+- domain redirect?
+- refactor components to Functional
+- move python code to python3
+- set up aws sam
+    - lambda to fetch data
+    - lambda to serve data to UI
+    - cloudwatch event to run it daily
+    - secret for API key?
+    - dynamo table to store data
+    - s3 bucket with site
+    - cloudfront
+
+- t-t-t-t-t-TESTING
