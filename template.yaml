@@ -22,6 +22,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref StockDataTable
+          DEFAULT_SKUS: "6364255,6364253,6257142,6257148,6257139,6257135"
       Events:
         RefreshScheduleEvent:
           Type: Schedule

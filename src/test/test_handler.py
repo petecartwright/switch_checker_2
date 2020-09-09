@@ -3,67 +3,28 @@ import re
 import unittest
 from unittest.mock import Mock, patch
 
+import boto3
+import moto
 import requests_mock
 
 import src.avail_check.handler as avail_check
 
-
-MOCK_GOOD_BBY_RESPONSE = {
-    "status_code": 200,
-    "json": {
-        "ispuEligible": True,
-        "stores": [
-            {
-                "storeID": "1465",
-                "name": "Mechanicsville",
-                "address": "7297 Battle Hill Dr",
-                "city": "Mechanicsville",
-                "state": "VA",
-                "postalCode": "23111",
-                "storeType": "Self_Delivery_Store",
-                "minPickupHours": None,
-                "lowStock": False,
-                "distance": 4.5,
-            },
-            {
-                "storeID": "1013",
-                "name": "Glen Allen",
-                "address": "9901 Brook Rd",
-                "city": "Glen Allen",
-                "state": "VA",
-                "postalCode": "23059",
-                "storeType": "Self_Delivery_Store",
-                "minPickupHours": None,
-                "lowStock": False,
-                "distance": 9.0,
-            },
-            {
-                "storeID": "422",
-                "name": "Chesterfield",
-                "address": "1560 W Koger Center Blvd",
-                "city": "Richmond",
-                "state": "VA",
-                "postalCode": "23235",
-                "storeType": "Self_Delivery_Store",
-                "minPickupHours": None,
-                "lowStock": False,
-                "distance": 12.3,
-            },
-        ],
-    },
-}
-
-BAD_BBY_DATA = {}
+from .mocks import MOCK_GOOD_BBY_RESPONSE, MOCK_GOOD_RESPONSE
 
 
 class TestHandler(unittest.TestCase):
-    def test_happypath(self):
+    """
+        Tests for lambda handler
+    """
+
+    @patch("boto3.client")
+    def test_happypath(self, mocked_boto):
         """
             Pass in some good zips and good skus, smooth sailing
         """
 
         os.environ["BEST_BUY_API_KEY"] = "123456"
-        os.environ["BEST_BUY_API_KEY"] = "FakeTableName"
+        os.environ["TABLE_NAME"] = "FakeTableName"
 
         event = {
             "queryStringParameters": {
@@ -78,13 +39,64 @@ class TestHandler(unittest.TestCase):
             # whenever we use requests to .get this URL, we intercept it
             m.get(url_matcher, **MOCK_GOOD_BBY_RESPONSE)
             response = avail_check.handler(event=event, context={})
-
-            self.assertDictEqual(
-                response,
-                {"status": 200, "number_of_skus": 6, "stock_found": 5, "error": ""},
-            )
+            self.assertDictEqual(response, MOCK_GOOD_RESPONSE)
 
         self.assertTrue(response["status"] == 200)
+
+    @patch("boto3.client")
+    def test_bad_zip(self, mocked_boto):
+        """
+            Pass in some a bad zip code, should fail
+        """
+
+        os.environ["BEST_BUY_API_KEY"] = "123456"
+        os.environ["TABLE_NAME"] = "FakeTableName"
+
+        event = {
+            "queryStringParameters": {
+                "skus": "12345,54321,90123,24601",
+                "zip_code": "sdfd23223",
+            }
+        }
+
+        with requests_mock.Mocker() as m:
+            # happy best buy API response
+            url_matcher = re.compile(r"https:\/\/api\.bestbuy\.com.*")
+            # whenever we use requests to .get this URL, we intercept it
+            m.get(url_matcher, **MOCK_GOOD_BBY_RESPONSE)
+            response = avail_check.handler(event=event, context={})
+
+        self.assertTrue(response["status"] == 400)
+
+    @patch("boto3.client")
+    def test_no_api_key(self, mocked_boto):
+        """
+            If we don't have an API key set, we should fail hard
+        """
+
+        del os.environ["BEST_BUY_API_KEY"]
+        event = {
+            "queryStringParameters": {
+                "skus": "12345,54321,90123,24601",
+                "zip_code": "23223",
+            }
+        }
+
+        response = avail_check.handler(event=event, context={})
+
+        self.assertTrue(response["status"] == 500)
+
+    @patch("boto3.client")
+    def test_no_params(self, mocked_boto):
+        """
+            If we don't have an API key set, we should fail hard
+        """
+
+        event = {}
+
+        response = avail_check.handler(event=event, context={})
+
+        self.assertTrue(response["status"] == 400)
 
     def test_format_zip_code(self):
         """

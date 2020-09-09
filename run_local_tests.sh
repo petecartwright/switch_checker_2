@@ -13,7 +13,7 @@ fi
 
 coverage run -m unittest && coverage report -m
 
-# go back to whatever env you were in before
+# go back to whatever env you were in before    2
 if [[ ${CONDA_DEFAULT_ENV} != ${STARTING_ENV} ]]; then
     conda activate $STARTING_ENV
 fi
